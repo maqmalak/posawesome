@@ -5,7 +5,7 @@ frappe.ui.form.on("POS Closing Shift", {
 	onload: function (frm) {
 		frm.set_query("pos_profile", function (doc) {
 			return {
-				filters: { user: doc.user },
+				filters: { company: doc.company },
 			};
 		});
 

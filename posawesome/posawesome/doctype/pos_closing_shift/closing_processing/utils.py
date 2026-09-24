@@ -25,3 +25,20 @@ def get_base_value(doc, fieldname, base_fieldname=None, conversion_rate=None):
         )
 
     return flt(value) * flt(conversion_rate or 1)
+
+
+def resolve_payment_currency(payment_row, invoice_currency, company_currency=None):
+    """Return the currency a payment row was tendered in, falling back to the
+    invoice's currency (and then the company currency) when the row doesn't
+    carry its own."""
+
+    for fieldname in (
+        "posa_payment_currency",
+        "currency",
+        "account_currency",
+        "payment_currency",
+    ):
+        value = payment_row.get(fieldname)
+        if value:
+            return value
+    return invoice_currency or company_currency
