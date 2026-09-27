@@ -152,7 +152,7 @@
 							/>
 							<ItemsSelectorCards
 								v-else-if="items_view === 'card'"
-								ref="itemsContainer"
+								ref="cardAreaRef"
 								:displayed-items="displayedItems"
 								:is-loading="isLoadingOrSyncing"
 								:search-input="search_input"
@@ -919,6 +919,7 @@ const { getItemRateInfo } = useItemRateInfo({
 });
 
 const {
+	cardAreaRef,
 	isOverflowing,
 	cardColumns,
 	cardRowHeight,

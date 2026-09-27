@@ -15,6 +15,23 @@ export const getCardColumns = (width: number): number => {
     return 3;
 };
 
+export const MIN_CARD_WIDTH = 150;
+export const MAX_CARD_COLUMNS = 5;
+
+/**
+ * Fits as many cards of at least MIN_CARD_WIDTH as the measured container
+ * allows, capped at MAX_CARD_COLUMNS.
+ */
+export const getCardColumnsForContainer = (
+    containerWidth: number,
+    gap: number,
+    padding: number,
+): number => {
+    const usable = containerWidth - padding * 2 + gap;
+    const columns = Math.floor(usable / (MIN_CARD_WIDTH + gap));
+    return Math.min(MAX_CARD_COLUMNS, Math.max(1, columns));
+};
+
 /**
  * Calculates the gap between cards based on container width.
  */

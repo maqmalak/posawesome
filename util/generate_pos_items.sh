@@ -12,6 +12,7 @@
 #
 # Usage:
 #   ./generate_pos_items.sh [site] [warehouse] [company]
+#   REFRESH_IMAGES=1 ./generate_pos_items.sh   # also redraw images of existing items
 #
 # Defaults match this bench's current setup:
 #   site      = micromaxerp
@@ -25,7 +26,7 @@ WAREHOUSE="${2:-Branch Lahore - MEPL}"
 COMPANY="${3:-MicroMax Erp Pvt Ltd.}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BENCH_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+BENCH_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"  # <bench>/apps/posawesome/util
 
 PAYLOAD="$(mktemp /tmp/generate_pos_items.XXXXXX.py)"
 trap 'rm -f "$PAYLOAD"' EXIT
@@ -36,6 +37,7 @@ from frappe.utils.file_manager import save_file
 
 COMPANY = "__COMPANY__"
 WAREHOUSE = "__WAREHOUSE__"
+REFRESH_IMAGES = "__REFRESH_IMAGES__" == "1"
 PRICE_LIST = "Standard Selling"
 CURRENCY = "PKR"
 UOM = "Nos"
@@ -84,12 +86,36 @@ CATEGORIES = [
 ]
 
 
+# Landscape 16:10 with a full-bleed background: POS item cards show images with
+# object-fit: cover in a wide, 170px-tall box, which clipped the old square icons.
 def make_svg(emoji: str, color: str, tint: str) -> str:
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
-  <circle cx="60" cy="60" r="56" fill="{tint}" stroke="{color}" stroke-width="2" stroke-opacity="0.4"/>
-  <circle cx="60" cy="60" r="46" fill="{color}" fill-opacity="0.12"/>
-  <text x="60" y="76" font-size="54" text-anchor="middle" font-family="'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif">{emoji}</text>
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="75%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="{tint}"/>
+    </radialGradient>
+  </defs>
+  <rect width="320" height="200" fill="url(#bg)"/>
+  <circle cx="160" cy="100" r="66" fill="{color}" fill-opacity="0.10" stroke="{color}" stroke-width="2" stroke-opacity="0.35"/>
+  <text x="160" y="126" font-size="74" text-anchor="middle" font-family="'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif">{emoji}</text>
 </svg>'''
+
+
+def set_image(item_code: str, emoji: str, cat: dict):
+    """Attach a freshly drawn image and drop the previous generated one. A new
+    file URL also makes browsers and the POS offline cache fetch the new art."""
+    old_url = frappe.db.get_value("Item", item_code, "image")
+    svg = make_svg(emoji, cat["color"], cat["tint"])
+    file_doc = save_file(f"{item_code}.svg", svg, "Item", item_code, is_private=0, decode=False)
+    frappe.db.set_value("Item", item_code, "image", file_doc.file_url)
+    if old_url and old_url != file_doc.file_url:
+        for name in frappe.get_all(
+            "File",
+            filters={"attached_to_doctype": "Item", "attached_to_name": item_code, "file_url": old_url},
+            pluck="name",
+        ):
+            frappe.delete_doc("File", name, force=True, ignore_permissions=True)
 
 
 def ensure_item_defaults(item_doc) -> bool:
@@ -152,6 +178,9 @@ def run():
                 changed = ensure_item_defaults(item)
                 if changed:
                     item.save(ignore_permissions=True)
+                if REFRESH_IMAGES or not item.image:
+                    set_image(item_code, emoji, cat)
+                    changed = True
                 ensure_opening_stock(item_code, valuation_rate, recon_rows)
                 report.append((item_code, "repaired" if changed else "already ok"))
                 continue
@@ -165,9 +194,7 @@ def run():
             ensure_item_defaults(item)
             item.insert(ignore_permissions=True)
 
-            svg = make_svg(emoji, cat["color"], cat["tint"])
-            file_doc = save_file(f"{item_code}.svg", svg, "Item", item_code, is_private=0, decode=False)
-            frappe.db.set_value("Item", item_code, "image", file_doc.file_url)
+            set_image(item_code, emoji, cat)
 
             if not frappe.db.exists(
                 "Item Price", {"item_code": item_code, "price_list": PRICE_LIST}
@@ -202,7 +229,7 @@ for code, label in run():
     print(code, "->", label)
 PYEOF
 
-sed -i "s|__COMPANY__|${COMPANY}|; s|__WAREHOUSE__|${WAREHOUSE}|" "$PAYLOAD"
+sed -i "s|__COMPANY__|${COMPANY}|; s|__WAREHOUSE__|${WAREHOUSE}|; s|__REFRESH_IMAGES__|${REFRESH_IMAGES:-0}|" "$PAYLOAD"
 
 cd "$BENCH_ROOT"
 printf "exec(open('%s').read(), globals())\n" "$PAYLOAD" | bench --site "$SITE" console

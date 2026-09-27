@@ -169,10 +169,17 @@ defineExpose({ scrollToItem, getScrollerElement, scrollerRef });
 	transform: translate3d(0, 0, 0);
 }
 
+/* Cards are absolutely positioned by the recycle scroller, so padding on the
+   inner list doesn't offset them; pad the scroll container instead. The extra
+   room also keeps the hover lift / highlight ring of the first row visible. */
 .virtual-scroller {
 	height: calc(100% - 80px);
 	overflow-y: auto;
+	overflow-x: hidden;
 	position: relative;
+	box-sizing: border-box;
+	padding-top: 14px;
+	padding-left: 14px;
 }
 
 .virtual-scroller .items-card-grid {

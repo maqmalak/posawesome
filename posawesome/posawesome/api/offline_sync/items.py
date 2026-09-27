@@ -130,6 +130,7 @@ def sync_items(
                 search_value="",
                 customer=customer,
                 limit=fetch_limit,
+                include_image=1,
                 **pagination_args,
             )
             or []

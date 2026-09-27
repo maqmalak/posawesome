@@ -17,7 +17,8 @@
 			<v-img
 				:src="item.image || placeholderImage"
 				class="card-item-image"
-				aspect-ratio="1"
+				height="100%"
+				cover
 				:alt="item.item_name"
 			>
 				<template #placeholder>
@@ -230,10 +231,12 @@ const onDragEnd = (event) => {
 	background: var(--pos-primary-container);
 }
 
+/* Image absorbs whatever height the text doesn't need, so the price row is never
+   pushed out of the fixed-height card when a long name wraps. */
 .card-item-image-container {
 	position: relative;
-	height: 132px;
-	flex-shrink: 0;
+	flex: 1 1 auto;
+	min-height: 96px;
 	overflow: hidden;
 	background:
 		linear-gradient(
@@ -245,9 +248,11 @@ const onDragEnd = (event) => {
 }
 
 .card-item-image {
+	position: absolute;
+	inset: 0;
 	width: 100%;
 	height: 100%;
-	object-fit: contain; /* Changed to contain to ensure full image visibility */
+	object-fit: cover; /* fill the whole image area of the card */
 	background-color: rgb(var(--v-theme-surface-bright));
 }
 
@@ -262,27 +267,31 @@ const onDragEnd = (event) => {
 }
 
 .card-item-content {
-	padding: var(--pos-space-3);
+	padding: var(--pos-space-2) var(--pos-space-3) var(--pos-space-3);
 	display: flex;
 	flex-direction: column;
-	flex-grow: 1;
-	justify-content: space-between;
+	flex: 0 0 auto;
 	gap: var(--pos-space-2);
+	min-width: 0;
 }
 
 .card-item-header {
 	display: flex;
 	flex-direction: column;
-	gap: var(--pos-space-1);
+	gap: 2px;
+	min-width: 0;
 }
 
+/* Always reserve two lines so one- and two-line names keep cards aligned. */
 .card-item-name {
-	font-size: 0.98rem;
+	font-size: 0.92rem;
 	font-weight: 650;
 	margin: 0;
-	line-height: 1.35;
+	line-height: 1.3;
+	min-height: calc(2 * 1.3em);
 	color: var(--pos-text-primary);
 	overflow: hidden;
+	overflow-wrap: anywhere;
 	display: -webkit-box;
 	-webkit-line-clamp: 2;
 	line-clamp: 2;
@@ -302,28 +311,37 @@ const onDragEnd = (event) => {
 
 .card-item-details {
 	display: flex;
+	flex-wrap: wrap;
 	justify-content: space-between;
-	align-items: flex-start;
-	margin-top: auto; /* Push to bottom */
-	gap: var(--pos-space-2);
+	align-items: center;
+	gap: 4px var(--pos-space-2);
+	min-width: 0;
 }
 
 .card-item-price {
 	display: flex;
 	flex-direction: column;
-	gap: var(--pos-space-1);
+	gap: 2px;
 	min-width: 0;
+	flex: 1 1 auto;
 }
 
 .primary-price {
 	display: flex;
-	align-items: baseline;
-	flex-wrap: wrap;
-	gap: var(--pos-space-1);
+	align-items: center;
+	gap: 3px;
 	font-weight: 750;
 	color: var(--pos-primary);
-	font-size: 1.08rem;
+	font-size: 1rem;
+	line-height: 1.2;
 	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.primary-price .price-amount {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	min-width: 0;
 }
 
 .secondary-price {
@@ -335,11 +353,13 @@ const onDragEnd = (event) => {
 	text-align: right;
 	font-size: 0.82rem;
 	color: var(--pos-text-secondary);
-	display: flex;
+	display: inline-flex;
 	flex-direction: row;
-	align-items: flex-end;
-	gap: 6px;
-	padding: 6px 8px;
+	align-items: center;
+	flex: 0 0 auto;
+	gap: 4px;
+	padding: 3px 7px;
+	line-height: 1.2;
 	border-radius: var(--pos-radius-xs);
 	border: 1px solid var(--pos-border-light);
 	background: var(--pos-surface-muted);
@@ -361,10 +381,6 @@ const onDragEnd = (event) => {
 }
 
 @media (max-width: 768px) {
-	.card-item-image-container {
-		height: 112px;
-	}
-
 	.card-item-content {
 		padding: var(--pos-space-2);
 	}

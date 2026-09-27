@@ -124,6 +124,7 @@ def get_delta_items(
             customer=customer,
             limit=resolved_limit,
             modified_after=parsed_modified_after.isoformat(),
+            include_image=1,
         )
         or []
     )
@@ -180,6 +181,7 @@ def get_delta_items(
         "max_discount",
         "brand",
         "allow_negative_stock",
+        "image",
     ]
     fields.extend([field for field in installed_item_search_fields() if field not in fields])
 

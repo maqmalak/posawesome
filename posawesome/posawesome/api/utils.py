@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from functools import cache
+from frappe.utils.caching import request_cache
 from typing import Any
 
 import frappe
@@ -160,6 +160,9 @@ def expand_item_groups(item_groups):
     for group in item_groups:
         if not group:
             continue
+
+        # Items can be assigned directly to a group node, so keep the group itself.
+        expanded_groups.add(group)
 
         # Check if this is a parent group
         is_group = frappe.db.get_value("Item Group", group, "is_group")
@@ -358,13 +361,13 @@ def log_perf_event(event: str, started_at: float, **context):
     logger.info("[POSA_PERF] event=%s elapsed_ms=%s %s", event, elapsed_ms, context_str)
 
 
-@cache
+@request_cache
 def get_item_groups(pos_profile: str) -> list[str]:
     """Return all item groups for a POS profile, including descendants.
 
     The linked groups from the ``POS Item Group`` child table are
     expanded to include all of their descendants. Results are cached
-    to avoid duplicate database calls within a process.
+    to avoid duplicate database calls within a request.
 
 
     """

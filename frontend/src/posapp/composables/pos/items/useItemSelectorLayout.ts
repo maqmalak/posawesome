@@ -1,9 +1,11 @@
-import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
 import _ from "lodash";
 import {
 	getCardColumns,
+	getCardColumnsForContainer,
 	getCardGap,
 	getCardPadding,
+	MIN_CARD_WIDTH,
 } from "../../../utils/itemSelectorLayout.js";
 
 type SelectorLayoutOptions = {
@@ -25,12 +27,26 @@ export function useItemSelectorLayout(options: SelectorLayoutOptions = {}) {
 	const windowWidth = ref(window.innerWidth);
 	const isOverflowing = ref(false);
 	const itemsContainerRef = ref<any>(null);
+	// Width-only measurement ref. Kept separate from itemsContainerRef on purpose:
+	// binding that one activates checkItemContainerOverflow, which parses the
+	// `--container-height: 70vh` CSS var as 70px and clamps the card grid to ~1px.
+	const cardAreaRef = ref<any>(null);
 	const scrollThrottle = ref<number | null>(null);
+	const measuredContainerWidth = ref(0);
+	let containerObserver: ResizeObserver | null = null;
 
 	// Computed Metrics
-	const cardColumns = computed(() => getCardColumns(windowWidth.value));
 	const cardGap = computed(() => getCardGap(windowWidth.value));
 	const cardPadding = computed(() => getCardPadding(windowWidth.value));
+	const cardColumns = computed(() =>
+		measuredContainerWidth.value
+			? getCardColumnsForContainer(
+					measuredContainerWidth.value,
+					cardGap.value,
+					cardPadding.value,
+				)
+			: getCardColumns(windowWidth.value),
+	);
 
 	const cardRowHeight = computed(() => {
 		if (windowWidth.value <= 768) {
@@ -45,16 +61,10 @@ export function useItemSelectorLayout(options: SelectorLayoutOptions = {}) {
 	const cardSlotHeight = computed(() => cardRowHeight.value + cardGap.value);
 	const cardSlotWidth = computed(() => cardColumnWidth.value + cardGap.value);
 
-	const cardContainerWidth = computed(() => {
-		// If we have a reference to the container, try to get its width
-		// Otherwise fallback to an estimated width based on window
-		if (itemsContainerRef.value && itemsContainerRef.value.$el) {
-			return itemsContainerRef.value.$el.clientWidth;
-		}
-		// Fallback estimation (e.g. 5 columns of regular grid)
-		// This is just a safe default until mounted
-		return windowWidth.value * 0.4; // Approx 40% of screen for items selector usually
-	});
+	// Fall back to an estimate until the container has been measured.
+	const cardContainerWidth = computed(
+		() => measuredContainerWidth.value || windowWidth.value * 0.4,
+	);
 
 	const cardColumnWidth = computed(() => {
 		const columns = Math.max(1, cardColumns.value);
@@ -69,7 +79,7 @@ export function useItemSelectorLayout(options: SelectorLayoutOptions = {}) {
 		const paddingTotal = cardPadding.value * 2;
 		const available = Math.max(0, containerWidth - gapTotal - paddingTotal);
 		const width = Math.floor(available / columns);
-		return Math.max(180, width);
+		return Math.max(MIN_CARD_WIDTH, width);
 	});
 
 	// Actions
@@ -146,6 +156,25 @@ export function useItemSelectorLayout(options: SelectorLayoutOptions = {}) {
 		});
 	};
 
+	// The selector panel's width depends on the POS layout, not just the window,
+	// so track the card container itself.
+	watch(
+		cardAreaRef,
+		(target) => {
+			containerObserver?.disconnect();
+			const el = (target?.$el || target) as HTMLElement | null;
+			if (!el || typeof ResizeObserver === "undefined") return;
+			containerObserver = new ResizeObserver((entries) => {
+				const width = Math.round(entries[0]?.contentRect.width || 0);
+				if (width && width !== measuredContainerWidth.value) {
+					measuredContainerWidth.value = width;
+				}
+			});
+			containerObserver.observe(el);
+		},
+		{ flush: "post" },
+	);
+
 	// Lifecycle
 	onMounted(() => {
 		window.addEventListener("resize", scheduleCardMetricsUpdate);
@@ -157,6 +186,7 @@ export function useItemSelectorLayout(options: SelectorLayoutOptions = {}) {
 
 	onUnmounted(() => {
 		window.removeEventListener("resize", scheduleCardMetricsUpdate);
+		containerObserver?.disconnect();
 		if (scrollThrottle.value) {
 			cancelAnimationFrame(scrollThrottle.value);
 		}
@@ -168,6 +198,7 @@ export function useItemSelectorLayout(options: SelectorLayoutOptions = {}) {
 		windowWidth,
 		isOverflowing,
 		itemsContainerRef, // Bind this to the container in template
+		cardAreaRef,
 
 		// Computed
 		cardColumns,
